@@ -7,7 +7,7 @@
 
 #define SCREEN_WIDTH  1200
 #define SCREEN_HEIGHT 512
-#define INIT_BOID_COUNT 2000
+#define INIT_BOID_COUNT 400
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -46,9 +46,20 @@ void update_flock_params(Flock *flock)
         return document.getElementById('separation_input').value;
     });
 
+    double max_speed_value = EM_ASM_DOUBLE({
+        return document.getElementById('max_speed_input').value;
+    });
+
+    double visual_range_value = EM_ASM_DOUBLE({
+        return document.getElementById('visual_range_input').value;
+    });
+
     flock->cohesion_factor = cohesion_value * 0.06;
     flock->alignment_factor = alignment_value * 0.3;
-    flock->avoidance_factor = separation_value * 0.5;
+    flock->avoidance_factor = separation_value;
+
+    flock->max_speed = max_speed_value;
+    flock->visual_range = visual_range_value;
 }
 
 void handle_events(void *arg) 
@@ -73,17 +84,17 @@ int main()
         .boids = (Boid *)malloc(sizeof(Boid) * INIT_BOID_COUNT),
         .boid_count = INIT_BOID_COUNT,
         .flight_area = {
-            .x1 = 150,
-            .y1 = 150,
-            .x2 = SCREEN_WIDTH-150,
-            .y2 = SCREEN_HEIGHT-150
+            .x1 = 40,
+            .y1 = 40,
+            .x2 = SCREEN_WIDTH-40,
+            .y2 = SCREEN_HEIGHT-40
         },
         .visual_range = 32,
         .protected_range = 6,
         .cohesion_factor = 0.0005,
         .alignment_factor = 0.1,
         .avoidance_factor = 0.05,
-        .turn_factor = 0.1,
+        .turn_factor = 0.15,
         .min_speed = 2,
         .max_speed = 5
     };

@@ -22,13 +22,10 @@ void update_boids(Flock *flock)
                 double dy = boid->y - other_boid->y;
                 double square_distance = dx*dx + dy*dy;
 
-                if (square_distance < flock->protected_range * 
-                        flock->protected_range) {
-                    close_dx += boid->x - other_boid->x;
-                    close_dy += boid->y - other_boid->y;
-                }
                 if (square_distance < flock->visual_range * 
                         flock->visual_range) {
+                    close_dx += boid->x - other_boid->x;
+                    close_dy += boid->y - other_boid->y;
                     xpos_avg += other_boid->x;
                     ypos_avg += other_boid->y;
                     xvel_avg += other_boid->vx;
@@ -49,10 +46,15 @@ void update_boids(Flock *flock)
 
             boid->vy += (ypos_avg - boid->y)*flock->cohesion_factor;
             boid->vy += (yvel_avg - boid->vy)*flock->alignment_factor;
-        }
 
-        boid->vx += close_dx*flock->avoidance_factor;
-        boid->vy += close_dy*flock->avoidance_factor;
+            double mag = sqrt(close_dx*close_dx + close_dy*close_dy);
+
+            close_dx /= mag;
+            close_dy /= mag; 
+
+            boid->vx += close_dx*flock->avoidance_factor;
+            boid->vy += close_dy*flock->avoidance_factor;
+        }
 
         if (boid->y < flock->flight_area.y1) {
             boid->vy += flock->turn_factor;
