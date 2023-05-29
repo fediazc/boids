@@ -12,6 +12,7 @@ typedef struct BoidArea {
 typedef struct Flock {
     Boid *boids;
     int boid_count;
+    int max_boid_count;
     BoidArea flight_area;
     double visual_range;
     double protected_range;

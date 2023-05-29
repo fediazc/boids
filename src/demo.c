@@ -8,6 +8,7 @@
 #define SCREEN_WIDTH  1200
 #define SCREEN_HEIGHT 512
 #define INIT_BOID_COUNT 400
+#define MAX_BOID_COUNT 4000
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -54,12 +55,17 @@ void update_flock_params(Flock *flock)
         return document.getElementById('visual_range_input').value;
     });
 
+    double boid_count_value = EM_ASM_DOUBLE({
+        return document.getElementById('boid_count_input').value;
+    });
+
     flock->cohesion_factor = cohesion_value * 0.06;
     flock->alignment_factor = alignment_value * 0.3;
     flock->avoidance_factor = separation_value;
 
     flock->max_speed = max_speed_value;
     flock->visual_range = visual_range_value;
+    flock->boid_count = boid_count_value;
 }
 
 void handle_events(void *arg) 
@@ -81,8 +87,9 @@ int main()
             SDL_WINDOW_RESIZABLE, &window, &renderer);
 
     Flock flock = {
-        .boids = (Boid *)malloc(sizeof(Boid) * INIT_BOID_COUNT),
+        .boids = (Boid *)malloc(sizeof(Boid) * MAX_BOID_COUNT),
         .boid_count = INIT_BOID_COUNT,
+        .max_boid_count = MAX_BOID_COUNT,
         .flight_area = {
             .x1 = 40,
             .y1 = 40,
@@ -101,12 +108,17 @@ int main()
 
     srand(time(NULL));
 
-    for (int i = 0; i < flock.boid_count; i++) {
+    for (int i = 0; i < flock.max_boid_count; i++) {
         flock.boids[i].x = (rand() % (int)flock.flight_area.x2) + 1.0;
         flock.boids[i].y = (rand() % (int)flock.flight_area.y2) + 1.0;
         flock.boids[i].vx = -1 + (rand() % (3));
         flock.boids[i].vy = -1 + (rand() % (3));
     }
+
+
+    flock.boid_count = EM_ASM_DOUBLE({
+        return document.getElementById('boid_count_input').value;
+    });
 
     emscripten_set_main_loop_arg(*handle_events, &flock, 0, true);
 
