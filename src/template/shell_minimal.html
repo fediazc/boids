@@ -3,14 +3,159 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Emscripten-Generated Code</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Boids</title>
     <style>
-      .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
-      textarea.emscripten { font-family: monospace; width: 80%; }
-      div.emscripten { text-align: center; }
-      div.emscripten_border { border: 1px solid black; }
-      /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
-      canvas.emscripten { border: 0px none; background-color: black;}
+      :root {
+        --slider-thumb-color: #cd5b45;
+        --slider-track-color: white;
+        --param-panel-padding: 10px;
+        --param-panel-top: 20px;
+      }
+
+      body {
+        margin: 0;
+        font-family: monospace;
+        background-color: #cd5b45;
+        color: white;
+      }
+
+      .emscripten { 
+        padding-right: 0; margin-left: auto; margin-right: auto; display: block; 
+      }
+      
+      #canvas { 
+        border: 0px none; 
+        background-color: black;
+      }
+
+      #parameter-panel {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        float: left;
+        overflow: scroll;
+        top: var(--param-panel-top);
+        left: var(--param-panel-top);
+        max-height: calc(95% - (2 * var(--param-panel-padding)) - var(--param-panel-top));
+        background-color: rgba(0, 0, 0, 0.3);
+        padding: var(--param-panel-padding);
+        opacity: 0.5;
+      }
+
+      #parameter-panel:hover {
+        opacity: 1;
+      }
+
+      #parameter-panel .range-slider {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      #parameter-panel label {
+        text-align: right;
+        min-width: 100px;
+        padding-right:10px;
+      }
+
+      details > summary {
+        display: inline-block;
+        padding: 5px;
+        border: 1px solid white; 
+        font-weight: bold;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      details:hover summary {
+        background: white;
+        color: black;
+      }
+
+      details > summary::selection {
+        visibility: hidden;
+      }
+
+      details > summary::marker {
+        display: none;
+      }
+
+      details[open] > summary {
+        margin-bottom: 15px;
+      }
+
+      details > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      details[open] > summary::before {
+        content: 'Hide ';
+      }
+
+      details > summary::before {
+        content: 'Show ';
+      }
+
+      input[type="range"] {
+        appearance: none;
+        -webkit-appearance: none;
+        background: transparent;
+        height: 25px;
+        flex-grow: 1;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        border: 1px solid var(--slider-thumb-color);
+        background: var(--slider-thumb-color);
+        height: 36px;
+        width: 12px;
+        cursor: pointer;
+        margin-top: -14px;
+        box-shadow: 2px 2px 0px 0px black;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        border: 1px solid var(--slider-thumb-color);
+        border-radius: 0px;
+        background: var(--slider-thumb-color);
+        height: 34px;
+        width: 12px;
+        cursor: pointer;
+        box-shadow: 2px 2px 0px 0px black;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        border: 1px solid var(--slider-thumb-color);
+        background: var(--slider-thumb-color);
+        height: 36px;
+        width: 12px;
+        cursor: pointer;
+        box-shadow: 2px 2px 0px 0px black;
+      }
+
+      input[type="range"]::-webkit-slider-runnable-track {
+        background: white;
+        height: 8px;
+        cursor: pointer;
+        box-shadow: 2px 2px black;
+        border: 1px solid black;
+      }
+
+      input[type="range"]::-moz-range-track {
+        background: white;
+        height: 8px;
+        cursor: pointer;
+        box-shadow: 2px 2px black;
+        border: 1px solid black;
+      }
 
       .spinner {
         height: 50px;
@@ -27,6 +172,7 @@
         border-radius: 100%;
         background-color: rgb(200,100,250);
       }
+
       @-webkit-keyframes rotation {
         from {-webkit-transform: rotate(0deg);}
         to {-webkit-transform: rotate(360deg);}
@@ -43,54 +189,45 @@
         from {transform: rotate(0deg);}
         to {transform: rotate(360deg);}
       }
-
     </style>
   </head>
   <body>
-    <hr/>
     <figure style="overflow:visible;" id="spinner"><div class="spinner"></div><center style="margin-top:0.5em"><strong>emscripten</strong></center></figure>
     <div class="emscripten" id="status">Downloading...</div>
     <div class="emscripten">
       <progress value="0" max="100" id="progress" hidden=1></progress>  
     </div>
-    <div class="emscripten_border">
-      <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
-    </div>
-    <hr/>
-    <div class="emscripten">
-      <input type="checkbox" id="resize">Resize canvas
-      <input type="checkbox" id="pointerLock" checked>Lock/hide mouse pointer
-      &nbsp;&nbsp;&nbsp;
-      <input type="button" value="Fullscreen" onclick="Module.requestFullscreen(document.getElementById('pointerLock').checked, 
-                                                                                document.getElementById('resize').checked)">
-    </div>
-    
-    <hr/>
-    <textarea class="emscripten" id="output" rows="8"></textarea>
-    <hr>
-    <div>
-      <input type="range" id="boid_count_input" name="boid_count" min="1" max="4000" step="1">
-      <label for="boid_count_input">Boid Count</label>
-    </div>
-    <div>
-      <input type="range" id="cohesion_input" name="cohesion" min="0.01" max="1.0" step="0.01">
-      <label for="cohesion_input">Cohesion</label>
-    </div>
-    <div>
-      <input type="range" id="alignment_input" name="alignment" min="0.01" max="1.0" step="0.01">
-      <label for="alignment_input">Alignment</label>
-    </div>
-    <div>
-      <input type="range" id="separation_input" name="separation" min="0.01" max="1.0" step="0.01">
-      <label for="separation_input">Separation</label>
-    </div>
-    <div>
-      <input type="range" id="visual_range_input" name="visual_range" min="1" max="60" step="0.5">
-      <label for="visual_range_input">Boid Vision</label>
-    </div>
-    <div>
-      <input type="range" id="max_speed_input" name="max_speed" min="0" max="10" step="0.25">
-      <label for="max_speed_input">Max Speed</label>
+    <div id="boid-app">
+      <canvas class="app-canvas" id="canvas" tabindex=-1></canvas>
+      <div id="parameter-panel">
+        <details open>
+          <summary> Parameters</summary>
+          <div class="boid-parameter range-slider">
+            <label for="boid-count-input">Boid Count</label>
+            <input type="range" id="boid-count-input" name="boid-count" min="1" max="4000" step="1">
+          </div>
+          <div class="boid-parameter range-slider">
+            <label for="cohesion-input">Cohesion</label>
+            <input type="range" id="cohesion-input" name="cohesion" min="0.01" max="1.0" step="0.01">
+          </div>
+          <div class="boid-parameter range-slider">
+            <label for="alignment-input">Alignment</label>
+            <input type="range" id="alignment-input" name="alignment" min="0.01" max="1.0" step="0.01">
+          </div>
+          <div class="boid-parameter range-slider">
+            <label for="separation-input">Separation</label>
+            <input type="range" id="separation-input" name="separation" min="0.01" max="1.0" step="0.01">
+          </div>
+          <div class="boid-parameter range-slider">
+            <label for="visual-range-input">Boid Vision</label>
+            <input type="range" id="visual-range-input" name="visual-range" min="1" max="60" step="0.5">
+          </div>
+          <div class="boid-parameter range-slider">
+            <label for="max-speed-input">Max Speed</label>
+            <input type="range" id="max-speed-input" name="max-speed" min="0" max="10" step="0.25">
+          </div>
+        </details>
+      </div>
     </div>
     <script type='text/javascript'>
       var statusElement = document.getElementById('status');
@@ -99,7 +236,16 @@
 
       var Module = {
         preRun: [],
-        postRun: [],
+        postRun: [() => {
+            /* remove any unwanted events */
+            unwantedEventStrings = ['mouseup'];
+            JSEvents.eventHandlers.forEach((h, i) => {
+                if (unwantedEventStrings.includes(h.eventTypeString)) {
+                  JSEvents._removeHandler(i);
+                }
+              });
+          }
+        ],
         print: (function() {
           var element = document.getElementById('output');
           if (element) element.value = ''; // clear browser cache

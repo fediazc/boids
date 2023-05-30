@@ -2,13 +2,15 @@
 #include <stdbool.h>
 #include <time.h>
 #include <emscripten.h>
+#include <emscripten/html5.h>
 #include <SDL2/SDL.h>
 #include "boids.h"
 
-#define SCREEN_WIDTH  1200
-#define SCREEN_HEIGHT 512
+#define INIT_CANVAS_WIDTH  1200
+#define INIT_CANVAS_HEIGHT 512
 #define INIT_BOID_COUNT 400
 #define MAX_BOID_COUNT 4000
+#define FLOCK_MARGIN 40
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -17,9 +19,9 @@ void run_simulation(Flock *flock)
 {
     update_boids(flock);
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_SetRenderDrawColor(renderer, 0, 20, 64, 255);
     SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer, 120, 20, 180, 255);
+    SDL_SetRenderDrawColor(renderer, 225, 235, 191, 255);
 
     for (int i = 0; i < flock->boid_count; i++) {
         SDL_Rect rect = {
@@ -36,27 +38,27 @@ void run_simulation(Flock *flock)
 void update_flock_params(Flock *flock) 
 {
     double cohesion_value = EM_ASM_DOUBLE({
-        return document.getElementById('cohesion_input').value;
+        return document.getElementById('cohesion-input').value;
     });
 
     double alignment_value = EM_ASM_DOUBLE({
-        return document.getElementById('alignment_input').value;
+        return document.getElementById('alignment-input').value;
     });
 
     double separation_value = EM_ASM_DOUBLE({
-        return document.getElementById('separation_input').value;
+        return document.getElementById('separation-input').value;
     });
 
     double max_speed_value = EM_ASM_DOUBLE({
-        return document.getElementById('max_speed_input').value;
+        return document.getElementById('max-speed-input').value;
     });
 
     double visual_range_value = EM_ASM_DOUBLE({
-        return document.getElementById('visual_range_input').value;
+        return document.getElementById('visual-range-input').value;
     });
 
     double boid_count_value = EM_ASM_DOUBLE({
-        return document.getElementById('boid_count_input').value;
+        return document.getElementById('boid-count-input').value;
     });
 
     flock->cohesion_factor = cohesion_value * 0.06;
@@ -79,11 +81,33 @@ void handle_events(void *arg)
     run_simulation(flock);
 }
 
+void set_boid_canvas_size(int w, int h, Flock *flock) 
+{
+    emscripten_set_canvas_element_size("#canvas", w, h);
+    SDL_SetWindowSize(window, w, h);
+
+    flock->flight_area.x2 = w - FLOCK_MARGIN;
+    flock->flight_area.y2 = h - FLOCK_MARGIN;
+}
+
+EM_BOOL window_resize_callback(int eventType, const EmscriptenUiEvent *uiEvent, 
+                                void *userData) 
+{
+    Flock *flock = (Flock *)userData;
+
+    int w = uiEvent->windowInnerWidth;
+    int h = uiEvent->windowInnerHeight;
+
+    set_boid_canvas_size(w, h, flock);
+
+    return EM_FALSE;
+}
+
 int main() 
 {
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, 
+    SDL_CreateWindowAndRenderer(INIT_CANVAS_WIDTH, INIT_CANVAS_HEIGHT, 
             SDL_WINDOW_RESIZABLE, &window, &renderer);
 
     Flock flock = {
@@ -91,10 +115,10 @@ int main()
         .boid_count = INIT_BOID_COUNT,
         .max_boid_count = MAX_BOID_COUNT,
         .flight_area = {
-            .x1 = 40,
-            .y1 = 40,
-            .x2 = SCREEN_WIDTH-40,
-            .y2 = SCREEN_HEIGHT-40
+            .x1 = FLOCK_MARGIN,
+            .y1 = FLOCK_MARGIN,
+            .x2 = INIT_CANVAS_WIDTH-FLOCK_MARGIN,
+            .y2 = INIT_CANVAS_HEIGHT-FLOCK_MARGIN
         },
         .visual_range = 32,
         .protected_range = 6,
@@ -115,12 +139,18 @@ int main()
         flock.boids[i].vy = -1 + (rand() % (3));
     }
 
-
     flock.boid_count = EM_ASM_DOUBLE({
-        return document.getElementById('boid_count_input').value;
+        return document.getElementById('boid-count-input').value;
     });
 
-    emscripten_set_main_loop_arg(*handle_events, &flock, 0, true);
+    int window_width = EM_ASM_INT({ return window.innerWidth; });
+    int window_height = EM_ASM_INT({ return window.innerHeight; });
+
+    set_boid_canvas_size(window_width, window_height, &flock);
+
+    emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &flock, 
+            EM_FALSE, window_resize_callback);
+    emscripten_set_main_loop_arg(handle_events, &flock, 0, true);
 
     return 0;
 }
