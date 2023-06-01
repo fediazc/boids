@@ -24,6 +24,43 @@ typedef struct Flock {
     double max_speed;
 } Flock;
 
+typedef struct XY {
+    double x, y;
+} XY;
+
+typedef struct AABB {
+    XY center;
+    double half_dimension;
+} AABB;
+
+typedef struct BoidQuadTree {
+    int NODE_CAPACITY;
+    AABB boundary;
+    XY *points;
+    Boid *boids;
+    int size;
+    struct BoidQuadTree *northWest;
+    struct BoidQuadTree *northEast;
+    struct BoidQuadTree *southWest;
+    struct BoidQuadTree *southEast;
+} BoidQuadTree;
+
+typedef struct BoidNode {
+    Boid boid;
+    struct BoidNode *next;
+} BoidNode;
+
+int contains_point(AABB box, XY p);
+int intersects_AABB(AABB box, AABB other);
+BoidQuadTree *construct_quadtree(int cap, AABB box);
+void QT_subdivide(BoidQuadTree *qt);
+int QT_insert_boid(BoidQuadTree *qt, Boid *boid);
+BoidNode *QT_boids_in_range(AABB range, BoidQuadTree *qt);
+void QT_cleanup(BoidQuadTree *qt);
+void list_cleanup(BoidNode *boid);
+void push_boid(BoidNode **headRef, Boid newBoid);
+void push_all(BoidNode **listHead, BoidNode *otherHead);
 void update_boids(Flock *flock);
+double alphamaxbetamin(double a, double b);
 
 #endif

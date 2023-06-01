@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdbool.h>
 #include <time.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -9,8 +8,8 @@
 #define INIT_CANVAS_WIDTH  1200
 #define INIT_CANVAS_HEIGHT 512
 #define INIT_BOID_COUNT 400
-#define MAX_BOID_COUNT 4000
-#define FLOCK_MARGIN 40
+#define MAX_BOID_COUNT 10000
+#define FLOCK_MARGIN 0
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -125,7 +124,7 @@ int main()
         .cohesion_factor = 0.0005,
         .alignment_factor = 0.1,
         .avoidance_factor = 0.05,
-        .turn_factor = 0.15,
+        .turn_factor = 0.06,
         .min_speed = 2,
         .max_speed = 5
     };
@@ -150,7 +149,8 @@ int main()
 
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, &flock, 
             EM_FALSE, window_resize_callback);
-    emscripten_set_main_loop_arg(handle_events, &flock, 0, true);
+
+    emscripten_set_main_loop_arg(handle_events, &flock, 0, 1);
 
     return 0;
 }
