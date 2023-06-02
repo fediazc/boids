@@ -61,6 +61,5 @@ void list_cleanup(BoidNode *boid);
 void push_boid(BoidNode **headRef, Boid newBoid);
 void push_all(BoidNode **listHead, BoidNode *otherHead);
 void update_boids(Flock *flock);
-double alphamaxbetamin(double a, double b);
 
 #endif

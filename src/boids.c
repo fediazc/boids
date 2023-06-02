@@ -79,7 +79,7 @@ void update_boids(Flock *flock)
             boid->vy += (ypos_avg - boid->y)*flock->cohesion_factor;
             boid->vy += (yvel_avg - boid->vy)*flock->alignment_factor;
 
-            double mag = alphamaxbetamin(close_dx, close_dy);
+            double mag = sqrt(close_dx*close_dx + close_dy*close_dy);
 
             close_dx /= mag;
             close_dy /= mag;
@@ -101,7 +101,7 @@ void update_boids(Flock *flock)
             boid->vy -= flock->turn_factor;
         }
 
-        double speed = alphamaxbetamin(boid->vx, boid->vy);
+        double speed = sqrt(boid->vx*boid->vx + boid->vy*boid->vy);
 
         if (speed < flock->min_speed) {
             boid->vx = (boid->vx / speed)*flock->min_speed;
@@ -286,11 +286,4 @@ void list_cleanup(BoidNode *head)
         head = head->next;
         free(tmp);
     }
-}
-
-double alphamaxbetamin(double a, double b)
-{
-    double abs_a = fabs(a);
-    double abs_b = fabs(b);
-    return 0.9604338701*fmax(abs_a, abs_b) + 0.39782473476*fmin(abs_a, abs_b);
 }
