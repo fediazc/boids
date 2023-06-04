@@ -24,19 +24,10 @@ typedef struct Flock {
     double max_speed;
 } Flock;
 
-typedef struct XY {
-    double x, y;
-} XY;
-
-typedef struct AABB {
-    XY center;
-    double half_dimension;
-} AABB;
-
 typedef struct BoidQuadTree {
     int NODE_CAPACITY;
-    AABB boundary;
-    XY *points;
+    double x;
+    double y;
     Boid *boids;
     int size;
     struct BoidQuadTree *northWest;
@@ -50,16 +41,18 @@ typedef struct BoidNode {
     struct BoidNode *next;
 } BoidNode;
 
-int contains_point(AABB box, XY p);
-int intersects_AABB(AABB box, AABB other);
-BoidQuadTree *construct_quadtree(int cap, AABB box);
-void QT_subdivide(BoidQuadTree *qt);
-int QT_insert_boid(BoidQuadTree *qt, Boid *boid);
-BoidNode *QT_boids_in_range(AABB range, BoidQuadTree *qt);
+int contains_point(double bbx, double bby, double bbhd, double x, double y);
+int intersects_AABB(double bbx, double bby, double bbhd, double qtx, double qty, double qhd);
+BoidQuadTree *construct_quadtree(int cap, double cx, double cy);
+inline double QT_half_dimension(int depth, const double *rootlen);
+void QT_subdivide(BoidQuadTree *qt, int depth, const double *rootlen);
+int QT_insert_boid(BoidQuadTree *qt, Boid *boid, int depth, const double *rootlen);
+BoidNode *QT_boids_in_range(BoidQuadTree *qt, double bbx, double bby, double bbhd, int depth, const double *rootlen);
 void QT_cleanup(BoidQuadTree *qt);
 void list_cleanup(BoidNode *boid);
 void push_boid(BoidNode **headRef, Boid newBoid);
 void push_all(BoidNode **listHead, BoidNode *otherHead);
 void update_boids(Flock *flock);
+double ambm(double a, double b); 
 
 #endif

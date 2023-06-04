@@ -9,17 +9,13 @@ void update_boids(Flock *flock)
     Boid *init_ptr = flock->boids;
     Boid *boid = init_ptr;
 
-    AABB boundary = {
-        .center = {
-            .x = flock->flight_area.x2 / 2, 
-            .y = flock->flight_area.y2 / 2
-        },
-        .half_dimension = flock->flight_area.x2 / 2
-    };
+    double qtx = flock->flight_area.x2 / 2;
+    double qty =  flock->flight_area.y2 / 2;
+    double rootlen = flock->flight_area.x2 / 2;
 
-    BoidQuadTree *tree = construct_quadtree(15, boundary);
+    BoidQuadTree *tree = construct_quadtree(15, qtx, qty);
     for (int i = 0; i < flock->boid_count; i++) {
-        QT_insert_boid(tree, &(flock->boids[i]));
+        QT_insert_boid(tree, &(flock->boids[i]), 0, &rootlen);
     }
 
     for (int i = 0; i < flock->boid_count; i++, boid++) {
@@ -32,21 +28,21 @@ void update_boids(Flock *flock)
                
         int neighbor_count = 0;
 
-        AABB range = {
-            .center = {
-                .x = flock->boids[i].x,
-                .y = flock->boids[i].y
-            },
-            .half_dimension = flock->visual_range*2
-        };
+        double bbx = flock->boids[i].x;
+        double bby = flock->boids[i].y;
+        double bbhd = flock->visual_range*2;
 
-        BoidNode *other_boid_head = QT_boids_in_range(range, tree);
+        BoidNode *other_boid_head = NULL;
+        if (boid->x < flock->flight_area.x2 || boid->y < flock->flight_area.y2) {
+            other_boid_head = QT_boids_in_range(tree, bbx, bby, bbhd, 0, &rootlen);
+        }
+        
         BoidNode *other_boid = other_boid_head;
         while (other_boid != NULL) {
             double dx = boid->x - other_boid->boid.x;
             double dy = boid->y - other_boid->boid.y;
-            if (other_boid->boid.x != flock->boids[i].x && 
-                other_boid->boid.y != flock->boids[i].y &&
+            if (other_boid->boid.x != boid->x && 
+                other_boid->boid.y != boid->y &&
                 fabs(dx) < flock->visual_range &&
                 fabs(dy) < flock->visual_range) {
                 
@@ -79,7 +75,7 @@ void update_boids(Flock *flock)
             boid->vy += (ypos_avg - boid->y)*flock->cohesion_factor;
             boid->vy += (yvel_avg - boid->vy)*flock->alignment_factor;
 
-            double mag = sqrt(close_dx*close_dx + close_dy*close_dy);
+            double mag = ambm(close_dx, close_dy);
 
             close_dx /= mag;
             close_dy /= mag;
@@ -101,7 +97,7 @@ void update_boids(Flock *flock)
             boid->vy -= flock->turn_factor;
         }
 
-        double speed = sqrt(boid->vx*boid->vx + boid->vy*boid->vy);
+        double speed = ambm(boid->vx, boid->vy);
 
         if (speed < flock->min_speed) {
             boid->vx = (boid->vx / speed)*flock->min_speed;
@@ -121,37 +117,31 @@ void update_boids(Flock *flock)
     QT_cleanup(tree);
 }
 
-int contains_point(AABB box, XY p)
+double QT_half_dimension(int depth, const double *rootlen)
 {
-    double cx = box.center.x;
-    double cy = box.center.y;
-    double h = box.half_dimension;
-    return (p.x < cx + h) && (p.x > cx - h) && (p.y < cy + h) && (p.y > cy - h);
+    return depth ? *rootlen / (1 << depth) : *rootlen;
 }
 
-int intersects_AABB(AABB box, AABB other)
+int contains_point(double bbx, double bby, double bbhd, double x, double y)
 {
-    double cx = box.center.x;
-    double cy = box.center.y;
-    double h = box.half_dimension;
-    XY p1 = {.x = cx - h, .y = cy - h};
-    XY p2 = {.x = cx + h, .y = cy - h};
-    XY p3 = {.x = cx - h, .y = cy + h};
-    XY p4 = {.x = cx + h, .y = cy + h};
-
-    return contains_point(other, p1) ||
-            contains_point(other, p2) ||
-            contains_point(other, p3) ||
-            contains_point(other, p4);
+    return (x < bbx + bbhd) && (x > bbx - bbhd) && (y < bby + bbhd) && (y > bby - bbhd);
 }
 
-BoidQuadTree *construct_quadtree(int cap, AABB box)
+int intersects_AABB(double bbx, double bby, double bbhd, double qtx, double qty, double qhd)
+{
+    return contains_point(qtx, qty, qhd, bbx - bbhd, bby - bbhd) ||
+            contains_point(qtx, qty, qhd, bbx + bbhd, bby - bbhd) ||
+            contains_point(qtx, qty, qhd, bbx - bbhd, bby + bbhd) ||
+            contains_point(qtx, qty, qhd, bbx + bbhd, bby + bbhd);
+}
+
+BoidQuadTree *construct_quadtree(int cap, double cx, double cy)
 {
     BoidQuadTree *qt = (BoidQuadTree *)malloc(sizeof(BoidQuadTree));
     
     qt->NODE_CAPACITY = cap;
-    qt->boundary = box;
-    qt->points = (XY *)malloc(sizeof(XY) * cap);
+    qt->x = cx;
+    qt->y = cy;
     qt->boids = (Boid *)malloc(sizeof(Boid) * cap);
     qt->size = 0;
     qt->northEast = NULL;
@@ -162,25 +152,14 @@ BoidQuadTree *construct_quadtree(int cap, AABB box)
     return qt;
 }
 
-void QT_subdivide(BoidQuadTree *qt)
+void QT_subdivide(BoidQuadTree *qt, int depth, const double *rootlen)
 {
-    double qd = qt->boundary.half_dimension / 2.0;
-    double cx = qt->boundary.center.x;
-    double cy = qt->boundary.center.y;
-    XY c1 = {.x = cx - qd, .y = cy - qd};
-    XY c2 = {.x = cx + qd, .y = cy - qd};
-    XY c3 = {.x = cx - qd, .y = cy + qd};
-    XY c4 = {.x = cx + qd, .y = cy + qd};
+    double qd = QT_half_dimension(depth + 1, rootlen);
 
-    AABB box1 = {.center = c1, .half_dimension=qd};
-    AABB box2 = {.center = c2, .half_dimension=qd};
-    AABB box3 = {.center = c3, .half_dimension=qd};
-    AABB box4 = {.center = c4, .half_dimension=qd};
-
-    qt->northWest = construct_quadtree(qt->NODE_CAPACITY, box1);
-    qt->northEast = construct_quadtree(qt->NODE_CAPACITY, box2);
-    qt->southWest = construct_quadtree(qt->NODE_CAPACITY, box3);
-    qt->southEast = construct_quadtree(qt->NODE_CAPACITY, box4);
+    qt->northWest = construct_quadtree(qt->NODE_CAPACITY, qt->x - qd, qt->y - qd);
+    qt->northEast = construct_quadtree(qt->NODE_CAPACITY, qt->x + qd, qt->y - qd);
+    qt->southWest = construct_quadtree(qt->NODE_CAPACITY, qt->x - qd, qt->y + qd);
+    qt->southEast = construct_quadtree(qt->NODE_CAPACITY, qt->x + qd, qt->y + qd);
 }
 
 void push_boid(BoidNode **headRef, Boid newBoid)
@@ -194,6 +173,9 @@ void push_boid(BoidNode **headRef, Boid newBoid)
 
 void push_all(BoidNode **listHeadRef, BoidNode *otherHeadRef)
 {
+    if (*listHeadRef == otherHeadRef) {
+        return;
+    }
     if (*listHeadRef != NULL && otherHeadRef != NULL) {
         BoidNode *last = otherHeadRef;
         while (last->next != NULL) {
@@ -206,42 +188,42 @@ void push_all(BoidNode **listHeadRef, BoidNode *otherHeadRef)
     }
 }
 
-int QT_insert_boid(BoidQuadTree *qt, Boid *boid)
+int QT_insert_boid(BoidQuadTree *qt, Boid *boid, int depth, const double *rootlen)
 {
-    XY p = {.x = boid->x, .y = boid->y};
-    if (!contains_point(qt->boundary, p)) {
+    double hd = QT_half_dimension(depth, rootlen);
+    if (!contains_point(qt->x, qt->y, hd, boid->x, boid->y)) {
         return 0;
     }
 
     if (qt->size < qt->NODE_CAPACITY && qt->northWest == NULL) {
-        qt->points[qt->size] = p;
         qt->boids[qt->size] = *boid;
         qt->size++;
         return 1;
     }
 
     if (qt->northWest == NULL) {
-        QT_subdivide(qt);
+        QT_subdivide(qt, depth, rootlen);
     }
 
-    if (QT_insert_boid(qt->northWest, boid)) return 1;
-    if (QT_insert_boid(qt->northEast, boid)) return 1;
-    if (QT_insert_boid(qt->southWest, boid)) return 1;
-    if (QT_insert_boid(qt->southEast, boid)) return 1;
+    if (QT_insert_boid(qt->northWest, boid, depth + 1, rootlen)) return 1;
+    if (QT_insert_boid(qt->northEast, boid, depth + 1, rootlen)) return 1;
+    if (QT_insert_boid(qt->southWest, boid, depth + 1, rootlen)) return 1;
+    if (QT_insert_boid(qt->southEast, boid, depth + 1, rootlen)) return 1;
 
     return 0;
 }
 
-BoidNode *QT_boids_in_range(AABB range, BoidQuadTree *qt)
+BoidNode *QT_boids_in_range(BoidQuadTree *qt, double bbx, double bby, double bbhd, int depth, const double *rootlen)
 {
     BoidNode *boids_in_range = NULL;
 
-    if(!intersects_AABB(range, qt->boundary)) {
+    double hd = QT_half_dimension(depth, rootlen);
+    if(!intersects_AABB(bbx, bby, bbhd, qt->x, qt->y, hd)) {
         return boids_in_range;
     }
 
     for (int i = 0; i < qt->size; i++) {
-        if (contains_point(range, qt->points[i])) {
+        if (contains_point(bbx, bby, bbhd, qt->boids[i].x, qt->boids[i].y)) {
             push_boid(&boids_in_range, qt->boids[i]);
         }
     }
@@ -250,10 +232,10 @@ BoidNode *QT_boids_in_range(AABB range, BoidQuadTree *qt)
         return boids_in_range;
     }
 
-    push_all(&boids_in_range, QT_boids_in_range(range, qt->northWest));
-    push_all(&boids_in_range, QT_boids_in_range(range, qt->northEast));
-    push_all(&boids_in_range, QT_boids_in_range(range, qt->southWest));
-    push_all(&boids_in_range, QT_boids_in_range(range, qt->southEast));
+    push_all(&boids_in_range, QT_boids_in_range(qt->northWest, bbx, bby, bbhd, depth + 1, rootlen));
+    push_all(&boids_in_range, QT_boids_in_range(qt->northEast, bbx, bby, bbhd, depth + 1, rootlen));
+    push_all(&boids_in_range, QT_boids_in_range(qt->southWest, bbx, bby, bbhd, depth + 1, rootlen));
+    push_all(&boids_in_range, QT_boids_in_range(qt->southEast, bbx, bby, bbhd, depth + 1, rootlen));
 
     return boids_in_range;
 }
@@ -261,7 +243,6 @@ BoidNode *QT_boids_in_range(AABB range, BoidQuadTree *qt)
 void QT_cleanup(BoidQuadTree *qt)
 {
     if (qt->northWest == NULL) {
-        free(qt->points);
         free(qt->boids);
         free(qt);
         return;
@@ -272,7 +253,6 @@ void QT_cleanup(BoidQuadTree *qt)
     QT_cleanup(qt->southWest);
     QT_cleanup(qt->southEast);
 
-    free(qt->points);
     free(qt->boids);
     free(qt);
     return;
@@ -285,5 +265,16 @@ void list_cleanup(BoidNode *head)
         tmp = head;
         head = head->next;
         free(tmp);
+    }
+}
+
+double ambm(double a, double b)
+{
+    a = fabs(a);
+    b = fabs(b);
+    if (a > b) {
+        return a*0.960433870103 + b*0.397824734759;
+    } else {
+        return b*0.960433870103 + a*0.397824734759;
     }
 }

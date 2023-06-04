@@ -8,7 +8,7 @@
 #define INIT_CANVAS_WIDTH  1200
 #define INIT_CANVAS_HEIGHT 512
 #define INIT_BOID_COUNT 400
-#define MAX_BOID_COUNT 10000
+#define MAX_BOID_COUNT 40000
 #define FLOCK_MARGIN 0
 
 SDL_Window *window;
@@ -20,17 +20,20 @@ void run_simulation(Flock *flock)
 
     SDL_SetRenderDrawColor(renderer, 0, 20, 64, 255);
     SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer, 225, 235, 191, 255);
 
+    update_boids(flock);
+
+    SDL_SetRenderDrawColor(renderer, 225, 235, 191, 255);
     for (int i = 0; i < flock->boid_count; i++) {
-        SDL_Rect rect = {
-            .x = flock->boids[i].x,
-            .y = flock->boids[i].y,
+        SDL_FRect rect = {
+            .x = flock->boids[i].x - 3,
+            .y = flock->boids[i].y - 3,
             .w = 6,
             .h = 6
         };
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_RenderFillRectF(renderer, &rect);
     }
+
     SDL_RenderPresent(renderer);
 }
 
@@ -138,7 +141,7 @@ int main()
         flock.boids[i].vy = -1 + (rand() % (3));
     }
 
-    flock.boid_count = EM_ASM_DOUBLE({
+    flock.boid_count = EM_ASM_INT({
         return document.getElementById('boid-count-input').value;
     });
 
