@@ -1,17 +1,20 @@
 #include <stddef.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 #include "boids.h"
 
-void update_boids(Flock *flock) 
+void update_boids(Flock *flock, int wrap, neighbor_cb process_neighbor, tree_cb process_tree, void *data)
 {
     Boid *init_ptr = flock->boids;
     Boid *boid = init_ptr;
 
     double qtx = flock->flight_area.x2 / 2;
     double qty =  flock->flight_area.y2 / 2;
-    double rootlen = flock->flight_area.x2 / 2;
+    double rootlen;
+    if (flock->flight_area.x2 > flock->flight_area.y2)
+        rootlen = flock->flight_area.x2 / 2;
+    else
+        rootlen = flock->flight_area.y2 / 2;
 
     BoidQuadTree *tree = construct_quadtree(15, qtx, qty);
     for (int i = 0; i < flock->boid_count; i++) {
@@ -57,6 +60,10 @@ void update_boids(Flock *flock)
                     yvel_avg += other_boid->boid.vy;
 
                     neighbor_count++;
+
+                    if (process_neighbor) {
+                        process_neighbor(boid, &(other_boid->boid), data);
+                    }
                 }
             }
 
@@ -84,17 +91,27 @@ void update_boids(Flock *flock)
             boid->vy += close_dy*flock->avoidance_factor;
         }
 
-        if (boid->y < flock->flight_area.y1) {
-            boid->vy += flock->turn_factor;
+        if (flock->follow_flag && flock->follow_target_count >= 1 &&
+            flock->boid_count > 0) {
+            int group_size = flock->boid_count / flock->follow_target_count;
+            int group = i / group_size;
+            boid->vx += (flock->follow_x[group] - boid->x) * 0.001;
+            boid->vy += (flock->follow_y[group] - boid->y) * 0.001;
         }
-        if (boid->x > flock->flight_area.x2) {
-            boid->vx -= flock->turn_factor;
-        }
-        if (boid->x < flock->flight_area.x1) {
-            boid->vx += flock->turn_factor;
-        }
-        if (boid->y > flock->flight_area.y2) {
-            boid->vy -= flock->turn_factor;
+
+        if (!wrap) {
+            if (boid->y < flock->flight_area.y1) {
+                boid->vy += flock->turn_factor;
+            }
+            if (boid->x > flock->flight_area.x2) {
+                boid->vx -= flock->turn_factor;
+            }
+            if (boid->x < flock->flight_area.x1) {
+                boid->vx += flock->turn_factor;
+            }
+            if (boid->y > flock->flight_area.y2) {
+                boid->vy -= flock->turn_factor;
+            }
         }
 
         double speed = ambm(boid->vx, boid->vy);
@@ -112,7 +129,17 @@ void update_boids(Flock *flock)
         boid->x += boid->vx;
         boid->y += boid->vy;
 
+        if (wrap) {
+            if (boid->x < flock->flight_area.x1) boid->x = flock->flight_area.x2;
+            if (boid->x > flock->flight_area.x2) boid->x = flock->flight_area.x1;
+            if (boid->y < flock->flight_area.y1) boid->y = flock->flight_area.y2;
+            if (boid->y > flock->flight_area.y2) boid->y = flock->flight_area.y1;
+        }
+
         list_cleanup(other_boid_head);
+    }
+    if (process_tree != NULL) {
+        process_tree(tree, 0, &rootlen, data);
     }
     QT_cleanup(tree);
 }

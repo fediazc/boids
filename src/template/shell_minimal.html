@@ -3,25 +3,52 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Boids</title>
     <style>
       :root {
-        --slider-thumb-color: #cd5b45;
+        --slider-thumb-color: #007aff;
         --slider-track-color: white;
-        --param-panel-padding: 10px;
+        --param-panel-padding: 0px;
         --param-panel-top: 20px;
+        --background-color: #e1e1e1;
+        --foreground-color: #1e1e1e;
+        --parameter-panel-background-color: var(--foreground-color);
+        --font-color: white; 	
+        --main-border-radius: 6px;
+        --panel-min-width: calc(min(275px, 50vw));
+        --mobile-panel-min-width: 80vw;
+      }
+
+      html {
+        height: 100%;
+        overflow: hidden;
       }
 
       body {
         margin: 0;
         font-family: monospace;
-        background-color: #cd5b45;
-        color: white;
+        font-size: 16px;
+        background-color: var(--background-color);
+        color: var(--font-color);
+        overflow: hidden;
+        overscroll-behavior: none;
       }
 
+      body, #parameter-panel {
+        -webkit-touch-callout: none;
+      }
+
+      a {
+        color: #007aff;
+      }
+    
       .emscripten { 
-        padding-right: 0; margin-left: auto; margin-right: auto; display: block; 
+        padding-right: 0; 
+        margin-left: auto; 
+        margin-right: auto; 
+        color: var(--foreground-color);
+        text-align: center;
       }
       
       #canvas { 
@@ -29,19 +56,29 @@
         background-color: black;
       }
 
+      .message {
+        width: var(--panel-min-width);
+      }
+
+      /* Parameter Panel Styles */
+
       #parameter-panel {
         position: absolute;
         display: flex;
         flex-direction: column;
         align-items: center;
-        float: left;
-        overflow: scroll;
+        float: right;
+        overflow: auto;
+        scrollbar-width: thin;
+        scrollbar-color: gray rgba(0, 0, 0, 0.3);
+        overscroll-behavior: none;
+        overflow-x: hidden;
         top: var(--param-panel-top);
-        left: var(--param-panel-top);
-        max-height: calc(95% - (2 * var(--param-panel-padding)) - var(--param-panel-top));
-        background-color: rgba(0, 0, 0, 0.3);
-        padding: var(--param-panel-padding);
+        right: var(--param-panel-top);
+        max-height: calc(95% - var(--param-panel-top));
+        background-color: var(--parameter-panel-background-color);
         opacity: 0.5;
+        border-radius: var(--main-border-radius);
       }
 
       #parameter-panel:hover {
@@ -60,22 +97,28 @@
         padding-right:10px;
       }
 
+      details {
+        padding:5px;
+      }
+
+      details[open] {
+        padding: 20px;
+      }
+
       details > summary {
         display: inline-block;
         padding: 5px;
-        border: 1px solid white; 
+        border-radius: var(--main-border-radius);
+        background: var(--parameter-panel-background-color);
+        color: var(--font-color);
         font-weight: bold;
         cursor: pointer;
         list-style: none;
       }
 
-      details:hover summary {
-        background: white;
-        color: black;
-      }
-
-      details > summary::selection {
-        visibility: hidden;
+      details[open] > summary {
+        background: var(--font-color);
+        color: var(--parameter-panel-background-color);
       }
 
       details > summary::marker {
@@ -98,64 +141,162 @@
         content: 'Show ';
       }
 
+      /* End Parameter Panel */
+
+      /* Slider/Input Styles */
+
       input[type="range"] {
         appearance: none;
         -webkit-appearance: none;
         background: transparent;
         height: 25px;
+        min-width: var(--panel-min-width);
         flex-grow: 1;
       }
 
       input[type="range"]::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        border: 1px solid var(--slider-thumb-color);
         background: var(--slider-thumb-color);
-        height: 36px;
+        border: 1px solid black;
+        border-radius: var(--main-border-radius);
+        height: 34px;
         width: 12px;
         cursor: pointer;
         margin-top: -14px;
-        box-shadow: 2px 2px 0px 0px black;
       }
 
       input[type="range"]::-moz-range-thumb {
         -webkit-appearance: none;
         appearance: none;
-        border: 1px solid var(--slider-thumb-color);
-        border-radius: 0px;
-        background: var(--slider-thumb-color);
-        height: 34px;
-        width: 12px;
-        cursor: pointer;
-        box-shadow: 2px 2px 0px 0px black;
-      }
-
-      input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        border: 1px solid var(--slider-thumb-color);
+        border: 1px solid black;
+        border-radius: var(--main-border-radius);
         background: var(--slider-thumb-color);
         height: 36px;
-        width: 12px;
+        width: 10px;
         cursor: pointer;
-        box-shadow: 2px 2px 0px 0px black;
       }
 
       input[type="range"]::-webkit-slider-runnable-track {
-        background: white;
+        background: var(--slider-track-color);
+        border-radius: var(--main-border-radius);
         height: 8px;
         cursor: pointer;
-        box-shadow: 2px 2px black;
-        border: 1px solid black;
       }
 
       input[type="range"]::-moz-range-track {
-        background: white;
+        background: var(--slider-track-color);
+        border-radius: var(--main-border-radius);
         height: 8px;
         cursor: pointer;
-        box-shadow: 2px 2px black;
-        border: 1px solid black;
       }
+
+      .radio-button-panel, .checkbox-panel {
+        margin-bottom: 20px;
+      }
+
+      /* End Input */
+
+      /* Parameter Info Styles */
+
+      .param-info {
+        margin-bottom: 20px;
+      }
+
+      .param-info label, .param-title {
+        text-decoration: var(--font-color) underline;
+        -webkit-text-decoration: var(--font-color) underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 0.2em;
+      }
+
+      .tooltip-icon:hover + .tooltip {
+        visibility: visible;
+        transition: opacity 0.5s 0.2s;
+        opacity: 1;
+        z-index: 9999;
+      }
+
+      .tooltip {
+        position: absolute;
+        margin-top: 5px;
+        padding: 4px;
+        max-width: var(--panel-min-width);
+        border-radius: var(--main-border-radius);
+        background: var(--font-color);
+        color: var(--parameter-panel-background-color);
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .tooltip-icon {
+        position: absolute;
+        left: calc(var(--panel-min-width) - min(10vw, 30px));
+        margin-left: 20px;
+        text-decoration: var(--font-color) underline;
+        -webkit-text-decoration: var(--font-color) underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 0.2em;
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+
+      output {
+        background: white;
+        color: black;
+        padding: 2px;
+        border: 1px solid black;
+        border-radius: var(--main-border-radius);
+      }
+
+      /* End Parameter Info */
+
+      /* Mobile Styles */
+
+      @media screen and (max-width: 576px) {
+        input[type="range"] {
+            appearance: none;
+            -webkit-appearance: none;
+            background: transparent;
+            height: 25px;
+            min-width: var(--mobile-panel-min-width);
+            flex-grow: 1;
+        }
+
+        input[type="radio"] {
+          margin-bottom: 15px;
+        }
+
+        input[type="checkbox"] {
+          margin-bottom: 15px;
+        }
+
+        .tooltip {
+          min-width: var(--mobile-panel-min-width);
+        }
+
+        .tooltip-icon {
+          left: calc(80vw - 10vw);
+        }
+
+        #parameter-panel {
+          right: 0;
+        }
+
+        #parameter-panel:hover {
+          opacity: 0.8;
+        }
+
+        .param {
+          margin-bottom: 40px;
+        }
+
+        .message {
+          min-width: var(--mobile-panel-min-width);
+        }
+      }
+
+      /* End Mobile */
 
       .spinner {
         height: 50px;
@@ -165,12 +306,16 @@
         -moz-animation: rotation .8s linear infinite;
         -o-animation: rotation .8s linear infinite;
         animation: rotation 0.8s linear infinite;
-        border-left: 10px solid rgb(0,150,240);
-        border-right: 10px solid rgb(0,150,240);
-        border-bottom: 10px solid rgb(0,150,240);
-        border-top: 10px solid rgb(100,0,200);
+        border-left: 10px solid var(--background-color);
+        border-right: 10px solid var(--background-color);
+        border-bottom: 10px solid var(--background-color);
+        border-top: 10px solid rgb(30, 30, 30);
         border-radius: 100%;
-        background-color: rgb(200,100,250);
+        background-color: var(--background-color);
+      }
+
+      #spinner {
+        color: black;
       }
 
       @-webkit-keyframes rotation {
@@ -189,61 +334,196 @@
         from {transform: rotate(0deg);}
         to {transform: rotate(360deg);}
       }
+
+      .unselectable {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: auto;
+      }
+
+      ::-webkit-scrollbar-track {
+        background-color: rgba(0, 0, 0, 0.3);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: gray;
+      }
     </style>
   </head>
   <body>
-    <figure style="overflow:visible;" id="spinner"><div class="spinner"></div><center style="margin-top:0.5em"><strong>emscripten</strong></center></figure>
-    <div class="emscripten" id="status">Downloading...</div>
+    <figure style="overflow:visible;" id="spinner"><div class="spinner"></div><center style="margin-top:0.5em"><strong>BOIDS</strong></center></figure>
+    <div class="emscripten" id="status">
+     <p >Please wait...</p>
+      <noscript>
+        <p>It looks like you have JavaScript disabled. Unfortunately, it is required for this demo.</p>
+      </noscript>
+    </div>
     <div class="emscripten">
       <progress value="0" max="100" id="progress" hidden=1></progress>  
     </div>
     <div id="boid-app">
-      <canvas class="app-canvas" id="canvas" tabindex=-1></canvas>
-      <div id="parameter-panel">
-        <details open>
+      <canvas class="app-canvas" id="canvas" tabindex=-1 hidden></canvas>
+      <div id="parameter-panel" hidden>
+        <details id ="main-parameters" class="unselectable" open hidden>
+          <div class="message">
+            <p><strong>Boid Algorithm Demo</strong></p>
+            <p>You can click/touch and hold to attract the boids</p>
+          </div>
           <summary> Parameters</summary>
-          <div class="boid-parameter range-slider">
-            <label for="boid-count-input">Boid Count</label>
-            <input type="range" id="boid-count-input" name="boid-count" min="1" max="40000" step="1">
+          <div class="param">
+            <div class="param-info">
+              <label for="boid-count-input">Number of Boids</label>
+              <output id="boid-count-output"></output>
+            </div>
+            <div class="range-slider">
+              <input type="range" id="boid-count-input" name="boid-count" min="100" max="5000" step="100">
+            </div>
           </div>
-          <div class="boid-parameter range-slider">
-            <label for="cohesion-input">Cohesion</label>
-            <input type="range" id="cohesion-input" name="cohesion" min="0.01" max="1.0" step="0.01">
+          <div class="param">
+            <div class="param-info">
+              <label for="cohesion-input">Cohesion</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">Higher values will lead to boids forming tighter groups.</div>
+            </div>
+            <div class="boid-parameter range-slider">
+              <input type="range" id="cohesion-input" name="cohesion" min="0" max="1.0" step="0.01">
+            </div>
           </div>
-          <div class="boid-parameter range-slider">
-            <label for="alignment-input">Alignment</label>
-            <input type="range" id="alignment-input" name="alignment" min="0.01" max="1.0" step="0.01">
+          <div class="param">
+            <div class="param-info">
+              <label for="alignment-input">Alignment</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">Higher values will lead to boids flying in the same direction as nearby flockmates.</div>
+            </div>
+            <div class="boid-parameter range-slider">
+              <input type="range" id="alignment-input" name="alignment" min="0" max="1.0" step="0.01">
+            </div>
           </div>
-          <div class="boid-parameter range-slider">
-            <label for="separation-input">Separation</label>
-            <input type="range" id="separation-input" name="separation" min="0.01" max="1.0" step="0.01">
+          <div class="param">
+            <div class="param-info">
+              <label for="separation-input">Separation</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">Higher values will lead to less collisions between boids.</div>
+            </div>
+            <div class="boid-parameter range-slider">
+              <input type="range" id="separation-input" name="separation" min="0" max="1.0" step="0.01">
+            </div>
           </div>
-          <div class="boid-parameter range-slider">
-            <label for="visual-range-input">Boid Vision</label>
-            <input type="range" id="visual-range-input" name="visual-range" min="1" max="60" step="0.5">
+          <div class="param">
+            <div class="param-info">
+              <label for="visual-range-input">Vision Range</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">How far boids can see. Lower values may improve performance.</div>
+            </div>
+            <div class="boid-parameter range-slider">
+              <input type="range" id="visual-range-input" name="visual-range" min="1" max="60" step="0.5">
+            </div>
+            <div class="checkbox-panel">
+              <div class="boid-parameter checkbox">
+                <input type="checkbox" id="show-range-input" name="show-range">
+                <label for="show-range-input">Show vision range</label>
+                <span class="tooltip-icon">!</span>
+                <div class="tooltip">Might decrease performance at a high number of boids.</div>
+              </div>
+              <div class="boid-parameter checkbox">
+                <input type="checkbox" id="show-vision-input" name="show-vision">
+                <label for="show-vision-input">Show vision</label>
+                <span class="tooltip-icon">?</span>
+                <div class="tooltip">Boids that are neighbors will be connected by a line.</div>
+              </div>
+            </div>
           </div>
-          <div class="boid-parameter range-slider">
-            <label for="max-speed-input">Max Speed</label>
-            <input type="range" id="max-speed-input" name="max-speed" min="2" max="10" step="0.25">
+          <div class="param">
+            <div class="param-info">
+              <label for="speed-input">Boid Speed</label>
+            </div>
+            <div class="boid-parameter range-slider">
+              <input type="range" id="speed-input" name="speed" min="1" max="10" step="0.25">
+            </div>
+          </div>
+          <div class="param radio-button-panel">
+            <div class="param-info param-title">Behavior</div>
+            <div class="boid-parameter radio-button">
+              <input type="radio" id="wrap-behavior-input" name="behavior" value="wrap" checked>
+              <label for="wrap-behavior-input">Wrap-Around</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">
+                Boids will wrap around the screen to always remain in view.
+              </div>
+            </div>
+            <div class="boid-parameter radio-button">
+              <input type="radio" id="natural-behavior-input" name="behavior" value="natural">
+              <label for="natural-behavior-input">Natural</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">
+                When boids go out of view, they will turn and fly back into view (Recommended for large amounts of boids).
+              </div>
+            </div>
+          </div>
+          <div class="param">
+            <div class="param-info param-title">Other Options</div>
+            <div class="boid-parameter checkbox">
+              <input type="checkbox" id="show-grid-input" name="show-grid">
+              <label for="show-grid-input">Show grid</label>
+            </div>
+            <div class="boid-parameter checkbox">
+              <input type="checkbox" id="color-boids-input" name="color-boids">
+              <label for="color-boids-input">Color boids</label>
+              <span class="tooltip-icon">?</span>
+              <div class="tooltip">
+                Boids will be colored based on their speed.
+              </div>
+            </div>
           </div>
         </details>
       </div>
     </div>
     <script type='text/javascript'>
-      var statusElement = document.getElementById('status');
-      var progressElement = document.getElementById('progress');
-      var spinnerElement = document.getElementById('spinner');
-
       var Module = {
         preRun: [],
-        postRun: [() => {
-            /* remove any unwanted events */
-            unwantedEventStrings = ['mouseup'];
-            JSEvents.eventHandlers.forEach((h, i) => {
-                if (unwantedEventStrings.includes(h.eventTypeString)) {
-                  JSEvents._removeHandler(i);
-                }
-              });
+        postRun: [
+          () => {
+            // remove unwanted event
+            document.addEventListener('mouseup', (event) => {
+              if (event.target !== document.getElementById('canvas')) {
+                event.stopImmediatePropagation();
+              }
+            }, true);
+
+            // general setup
+            const statusElement = document.getElementById('status');
+            const progressElement = document.getElementById('progress');
+            const spinnerElement = document.getElementById('spinner');
+            statusElement.hidden = true;
+            progressElement.hidden = true;
+            spinnerElement.hidden = true;
+            
+            const paramPanel = document.getElementById('parameter-panel');
+            const paramDetails = document.getElementById('main-parameters');
+            paramPanel.hidden = false;
+            paramDetails.hidden = false;
+            canvas.hidden = false;
+
+
+            const countInput = document.getElementById('boid-count-input');
+            const countOutput = document.getElementById('boid-count-output');
+            countInput.value = 600;
+            countOutput.textContent = countInput.value.padStart(5, '0');
+            countInput.addEventListener('input', (event) => {
+              const padded = event.target.value.padStart(5, '0');
+              countOutput.textContent = padded;
+            });
+
+            const speedInput = document.getElementById('speed-input');
+            speedInput.value = 3;
           }
         ],
         print: (function() {
@@ -251,11 +531,6 @@
           if (element) element.value = ''; // clear browser cache
           return function(text) {
             if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-            // These replacements are necessary if you render to raw HTML
-            //text = text.replace(/&/g, "&amp;");
-            //text = text.replace(/</g, "&lt;");
-            //text = text.replace(/>/g, "&gt;");
-            //text = text.replace('\n', '<br>', 'g');
             console.log(text);
             if (element) {
               element.value += text + "\n";
@@ -265,49 +540,9 @@
         })(),
         canvas: (() => {
           var canvas = document.getElementById('canvas');
-
-          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
-          // application robust, you may want to override this behavior before shipping!
-          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
           canvas.addEventListener("webglcontextlost", (e) => { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
-
           return canvas;
         })(),
-        setStatus: (text) => {
-          if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-          if (text === Module.setStatus.last.text) return;
-          var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-          var now = Date.now();
-          if (m && now - Module.setStatus.last.time < 30) return; // if this is a progress update, skip it if too soon
-          Module.setStatus.last.time = now;
-          Module.setStatus.last.text = text;
-          if (m) {
-            text = m[1];
-            progressElement.value = parseInt(m[2])*100;
-            progressElement.max = parseInt(m[4])*100;
-            progressElement.hidden = false;
-            spinnerElement.hidden = false;
-          } else {
-            progressElement.value = null;
-            progressElement.max = null;
-            progressElement.hidden = true;
-            if (!text) spinnerElement.hidden = true;
-          }
-          statusElement.innerHTML = text;
-        },
-        totalDependencies: 0,
-        monitorRunDependencies: (left) => {
-          this.totalDependencies = Math.max(this.totalDependencies, left);
-          Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
-        }
-      };
-      Module.setStatus('Downloading...');
-      window.onerror = () => {
-        Module.setStatus('Exception thrown, see JavaScript console');
-        spinnerElement.style.display = 'none';
-        Module.setStatus = (text) => {
-          if (text) console.error('[post-exception status] ' + text);
-        };
       };
     </script>
     {{{ SCRIPT }}}
