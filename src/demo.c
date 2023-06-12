@@ -10,11 +10,24 @@
 #define INIT_CANVAS_WIDTH  1200
 #define INIT_CANVAS_HEIGHT 512
 #define INIT_BOID_COUNT 400
-#define MAX_BOID_COUNT 5000
 #define FLOCK_MARGIN 0
+
+#ifdef WALLPAPER
+
+#define MAX_BOID_COUNT 600
+
+#else
+
+#define MAX_BOID_COUNT 5000
+
+#endif
 
 SDL_Window *window;
 SDL_Renderer *renderer;
+
+typedef struct RGB {
+    uint8_t r, g, b;
+} RGB;
 
 void rot(double *x, double *y, double pivotx, double pivoty, double rads)
 {
@@ -47,14 +60,13 @@ void draw_boid(const Boid *boid, double h1, double h2, double w,
 
 void connect_boids(const Boid *boid, const Boid *neighbor, void *data)
 {
-    SDL_Renderer *renderer = (SDL_Renderer *)data;
-    SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
+    RGB *c = (RGB *)data;
+    SDL_SetRenderDrawColor(renderer, c->r, c->g, c->b, 255);
     SDL_RenderDrawLineF(renderer, boid->x, boid->y, neighbor->x, neighbor->y);
 }
 
 void draw_qt(const BoidQuadTree *tree, double depth, double *rootlen, void *data)
 {
-    SDL_Renderer *renderer = (SDL_Renderer *)data;
     double hd = QT_half_dimension(depth, rootlen);
     SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
     SDL_FRect rect = {.x = tree->x - hd, .y = tree->y - hd, .w = hd*2, .h = hd*2};
@@ -72,61 +84,99 @@ void draw_qt(const BoidQuadTree *tree, double depth, double *rootlen, void *data
 
 void run_simulation(Flock *flock)
 {
-    int draw_vision = EM_ASM_INT({
+    int draw_vision = 0;
+    int draw_radius = 0;
+    int draw_tree = 0;
+    int wrap = 0;
+    int color_flag = 0;
+
+    RGB bg_color = {.r = 225, .g = 225, .b = 225};
+    RGB boid_color = {.r = 30, .g = 30, .b = 30};
+
+    neighbor_cb neighbor_func_ptr = NULL;
+    tree_cb tree_func_ptr = NULL;
+    double *radius = NULL; 
+
+#ifndef WALLPAPER
+    draw_vision = EM_ASM_INT({
         return document.getElementById('show-vision-input').checked;
     });
 
-    int draw_radius = EM_ASM_INT({
+    draw_radius = EM_ASM_INT({
          return document.getElementById('show-range-input').checked;
     });
 
-    int draw_tree = EM_ASM_INT({
+    draw_tree = EM_ASM_INT({
         return document.getElementById('show-grid-input').checked;
     });
 
-    int color_flag = EM_ASM_INT({
+    color_flag = EM_ASM_INT({
         return document.getElementById('color-boids-input').checked;
     });
 
-    int wrap = EM_ASM_INT({
+    wrap = EM_ASM_INT({
         return document.getElementById('wrap-behavior-input').checked;
     });
+#else
+    boid_color.r = EM_ASM_INT({
+        return Module.WEProperties.boidColor.r
+    });
 
-    SDL_SetRenderDrawColor(renderer, 225, 225, 225, 255);
-    SDL_RenderClear(renderer);
+    boid_color.g = EM_ASM_INT({
+        return Module.WEProperties.boidColor.g
+    });
 
-    neighbor_cb neighbor_func_ptr = NULL;
+    boid_color.b = EM_ASM_INT({
+        return Module.WEProperties.boidColor.b
+    });
+    
+    bg_color.r = EM_ASM_INT({
+        return Module.WEProperties.backgroundColor.r
+    });
+    bg_color.g = EM_ASM_INT({
+        return Module.WEProperties.backgroundColor.g
+    });
+    bg_color.b = EM_ASM_INT({
+        return Module.WEProperties.backgroundColor.b
+    });
+
+    draw_vision = EM_ASM_INT({
+        return Module.WEProperties.drawVision;
+    });
+#endif
+
     if (draw_vision) {
         neighbor_func_ptr = connect_boids;
     }
 
-    tree_cb tree_func_ptr = NULL;
     if (draw_tree) {
         tree_func_ptr = draw_qt;
     }
 
-    double *radius = NULL; 
     if (draw_radius) {
         radius = &(flock->visual_range);
     }
 
-    update_boids(flock, wrap, neighbor_func_ptr, tree_func_ptr, renderer);
+    SDL_SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, 0);
+    SDL_RenderClear(renderer);
 
-    uint8_t r, g, b;
+    update_boids(flock, wrap, neighbor_func_ptr, tree_func_ptr, &boid_color);
+
     double speed;
     Boid *curr_boid;
     for (int i = 0; i < flock->boid_count; i++) {
         curr_boid = &(flock->boids[i]);
         speed = ambm(curr_boid->vx, curr_boid->vy);
-        r = color_flag ? (255/flock->max_speed)*speed : 30;
-        g = color_flag ? 0 : 30;
-        b = color_flag ? (-255/flock->max_speed)*speed + 255 : 30;
+        uint8_t r = color_flag ? (255/flock->max_speed)*speed : boid_color.r;
+        uint8_t g = color_flag ? 0 : boid_color.g;
+        uint8_t b = color_flag ? (-255/flock->max_speed)*speed + 255 : boid_color.b;
         draw_boid(curr_boid, 5.0, 7.0, 5.0, radius, r, g, b);
     }
 
     SDL_RenderPresent(renderer);
 }
 
+#ifndef WALLPAPER
 void update_flock_params(Flock *flock) 
 {
     double cohesion_value = EM_ASM_DOUBLE({
@@ -162,6 +212,41 @@ void update_flock_params(Flock *flock)
     flock->visual_range = visual_range_value;
     flock->boid_count = boid_count_value;
 }
+#else
+void update_flock_params(Flock *flock)
+{
+    flock->boid_count = EM_ASM_INT({
+        return Module.WEProperties.numberOfBoids;
+    });
+
+    flock->visual_range = EM_ASM_DOUBLE({
+        return Module.WEProperties.visualRange;
+    });
+
+    double speed_value = EM_ASM_DOUBLE({
+        return Module.WEProperties.boidSpeed;
+    });
+
+    double cohesion_value = EM_ASM_DOUBLE({
+        return Module.WEProperties.cohesion;
+    });
+
+    double alignment_value = EM_ASM_DOUBLE({
+        return Module.WEProperties.alignment;
+    });
+
+    double separation_value = EM_ASM_DOUBLE({
+        return Module.WEProperties.separation;
+    });
+
+    flock->cohesion_factor = cohesion_value * 0.06;
+    flock->alignment_factor = alignment_value * 0.3;
+    flock->avoidance_factor = separation_value;
+
+    flock->min_speed = speed_value;
+    flock->max_speed = speed_value * 2;
+}
+#endif
 
 void handle_events(void *arg) 
 {
@@ -306,9 +391,15 @@ int main()
 
     srand(time(NULL));
 
+#ifndef WALLPAPER
     flock.boid_count = EM_ASM_INT({
         return document.getElementById('boid-count-input').value;
     });
+#else
+    flock.boid_count = EM_ASM_INT({
+        return Module.WEProperties.numberOfBoids;
+    });
+#endif
 
     int window_width = EM_ASM_INT({ return window.innerWidth; });
     int window_height = EM_ASM_INT({ return window.innerHeight; });

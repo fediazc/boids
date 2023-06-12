@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Boids</title>
+    <style>
+      :root {
+        --background-color: #1e1e1e;
+        --foreground-color: #00ffff;
+        --font-color: white; 	
+      }
+
+      html {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        margin: 0;
+        font-family: monospace;
+        font-size: 16px;
+        background-color: var(--background-color);
+        color: var(--font-color);
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      .emscripten { 
+        padding-right: 0; 
+        margin-left: auto; 
+        margin-right: auto; 
+        color: var(--foreground-color);
+        text-align: center;
+      }
+      
+      #canvas { 
+        border: 0px none; 
+        background-color: black;
+      }
+
+      noscript {
+        color: --var(--font-color);
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      <p>It looks like you have JavaScript disabled. Unfortunately, it is required for this wallpaper.</p>
+    </noscript>
+    <div class="emscripten">
+      <progress value="0" max="100" id="progress" hidden=1></progress>  
+    </div>
+    <div id="boid-app">
+      <canvas class="app-canvas" id="canvas" tabindex=-1 hidden></canvas>
+    </div>
+    <script type='text/javascript'>
+      var Module = {
+        preRun: [],
+        postRun: [
+          () => {
+            // remove unwanted event
+            document.addEventListener('mouseup', (event) => {
+              if (event.target !== document.getElementById('canvas')) {
+                event.stopImmediatePropagation();
+              }
+            }, true);
+
+            canvas.hidden = false;
+          }
+        ],
+        print: (function() {
+          var element = document.getElementById('output');
+          if (element) element.value = ''; // clear browser cache
+          return function(text) {
+            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+            console.log(text);
+            if (element) {
+              element.value += text + "\n";
+              element.scrollTop = element.scrollHeight; // focus on bottom
+            }
+          };
+        })(),
+        canvas: (() => {
+          var canvas = document.getElementById('canvas');
+          canvas.addEventListener("webglcontextlost", (e) => { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+          return canvas;
+        })()
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
